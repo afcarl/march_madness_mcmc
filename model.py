@@ -8,14 +8,14 @@ defense_strength = np.empty(N, dtype=object)
 pace = np.empty(N, dtype=object)
 
 for i in range(N):
-    attack_strength[i] = pymc.Exponential('attack_strength_%i' % i+1,0.01)
-    defense_strength[i] = pymc.Exponential('defense_strength_%i' % i+1,0.01)
-    pace[i] = pymc.Exponential('pace_%i' % i+1,0.1)
+    attack_strength[i] = pymc.Exponential('attack_strength_%i' % i,0.01)
+    defense_strength[i] = pymc.Exponential('defense_strength_%i' % i,0.01)
+    pace[i] = pymc.Exponential('pace_%i' % i,0.1)
 
-matches = []
-odds = []
-totals = []
-spreads = []
+odds_matches = []
+odds_winner = []
+odds_totals = []
+odds_spreads = []
 
 #Dummy data
 for n in range(0,N,2):
@@ -24,33 +24,39 @@ for n in range(0,N,2):
     odds_totals.append(100+np.random.randint(50))
     odds_winner.append(0.5+0.5*np.random.random())
 
-home_score = np.empty(N, dtype=object)
-away_score = np.empty(N, dtype=object)
-total_score = np.empty(N, dtype=object)
-spread_score = np.empty(N, dtype=object)
-match_winner = np.empty(N, dtype=object)
+home_score = np.empty(N/2, dtype=object)
+away_score = np.empty(N/2, dtype=object)
+total_score = np.empty(N/2, dtype=object)
+spread_score = np.empty(N/2, dtype=object)
+match_winner = np.empty(N/2, dtype=object)
 
-match_winner_potential = np.empty(N, dtype=object)
-total_score_potential = np.empty(N, dtype=object)
-spread_score_potential = np.empty(N, dtype=object)
+match_winner_potential = np.empty(N/2, dtype=object)
+total_score_potential = np.empty(N/2, dtype=object)
+spread_score_potential = np.empty(N/2, dtype=object)
 
-for match in len(matches):
-    hteam = matches[match][0]
-    ateam = matches[match][1]
-    home_score_pre = pymc.Poisson('home_score_pre_%i' % match, mu = attack_strength[hteam]-defense_strength[ateam])
-    home_score_pre = pymc.Poisson('home_score_pre_%i' % match, mu = attack_strength[ateam]-defense_strength[hteam])
+for match in range(len(odds_matches)):
+    hteam = odds_matches[match][0]
+    ateam = odds_matches[match][1]
+    home_score_pre = pymc.Poisson('home_score_pre_%i' % match, mu = abs(attack_strength[hteam]-defense_strength[ateam]))
+    away_score_pre = pymc.Poisson('away_score_pre_%i' % match, mu = abs(attack_strength[ateam]-defense_strength[hteam]))
     pace_score = pymc.Poisson('pace_score_%i' % match, mu = pace[ateam]+pace[hteam])
     home_score[match] = home_score_pre + pace_score
     away_score[match] = away_score_pre + pace_score
     total_score[match] = home_score[match] + away_score[match]
     spread_score[match] = home_score_pre - away_score_pre
-    match_winner[match] = home_score > away_score
+    match_winner[match] = home_score[match] > away_score[match]
 
-    home_score[match].__name__ = 'home_score_' % match
-    away_score[match].__name__ = 'away_score_' % match
-    total_score[match].__name__ = 'total_score_' % match
-    spread_score[match].__name__ = 'spread_score_' % match
-    match_winner[match].__name__ = 'match_winner_' % match
+    home_score[match].__name__ = 'home_score_' + str(match)
+    away_score[match].__name__ = 'away_score_' + str(match)
+    total_score[match].__name__ = 'total_score_' + str(match)
+    spread_score[match].__name__ = 'spread_score_' + str(match)
+    match_winner[match].__name__ = 'match_winner_' + str(match)
+
+    home_score[match].keep_trace = True
+    away_score[match].keep_trace = True
+    total_score[match].keep_trace = True
+    spread_score[match].keep_trace = True
+    match_winner[match].keep_trace = True
 
     #combine outcomes and odds
     @pymc.potential
@@ -70,3 +76,5 @@ for match in len(matches):
     def spread_score_pot(spr_sco = spread_score[match], odds_spr = odds_spreads[match], odds_tot = odds_totals[match]):
         return pymc.distributions.normal_like(spr_sco, mu=odds_spr, tau = 1./odds_tot)
     spread_score_potential[match] = spread_score_pot
+
+model = pymc.MCMC(locals())
