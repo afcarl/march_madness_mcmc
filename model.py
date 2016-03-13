@@ -26,6 +26,9 @@ for n in range(0,N,2):
 
 home_score = np.empty(N/2, dtype=object)
 away_score = np.empty(N/2, dtype=object)
+pace_score = np.empty(N/2, dtype=object)
+home_score_pre = np.empty(N/2, dtype=object)
+away_score_pre = np.empty(N/2, dtype=object)
 total_score = np.empty(N/2, dtype=object)
 spread_score = np.empty(N/2, dtype=object)
 match_winner = np.empty(N/2, dtype=object)
@@ -37,13 +40,15 @@ spread_score_potential = np.empty(N/2, dtype=object)
 for match in range(len(odds_matches)):
     hteam = odds_matches[match][0]
     ateam = odds_matches[match][1]
-    home_score_pre = pymc.Poisson('home_score_pre_%i' % match, mu = abs(attack_strength[hteam]-defense_strength[ateam]))
-    away_score_pre = pymc.Poisson('away_score_pre_%i' % match, mu = abs(attack_strength[ateam]-defense_strength[hteam]))
-    pace_score = pymc.Poisson('pace_score_%i' % match, mu = pace[ateam]+pace[hteam])
-    home_score[match] = home_score_pre + pace_score
-    away_score[match] = away_score_pre + pace_score
+    home_score_pre[match] = pymc.Poisson('home_score_pre_%i' % match, 
+            mu = (attack_strength[hteam]-defense_strength[ateam] + abs(attack_strength[hteam]-defense_strength[ateam]))/2)
+    away_score_pre[match] = pymc.Poisson('away_score_pre_%i' % match, 
+            mu = (attack_strength[ateam]-defense_strength[hteam] + abs(attack_strength[ateam]-defense_strength[hteam]))/2)
+    pace_score[match] = pymc.Poisson('pace_score_%i' % match, mu = pace[ateam]+pace[hteam])
+    home_score[match] = home_score_pre[match] + pace_score[match]
+    away_score[match] = away_score_pre[match] + pace_score[match]
     total_score[match] = home_score[match] + away_score[match]
-    spread_score[match] = home_score_pre - away_score_pre
+    spread_score[match] = home_score_pre[match] - away_score_pre[match]
     match_winner[match] = home_score[match] > away_score[match]
 
     home_score[match].__name__ = 'home_score_' + str(match)
